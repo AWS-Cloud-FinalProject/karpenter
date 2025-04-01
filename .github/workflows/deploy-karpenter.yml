@@ -7,7 +7,7 @@ on:
 
 env:
   AWS_REGION: us-west-2  # 변경 필요
-  CLUSTER_NAME: wiray  # 변경 필요
+  CLUSTER_NAME: wiary
   KARPENTER_VERSION: 0.16.3
 
 jobs:
