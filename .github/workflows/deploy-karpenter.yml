@@ -90,6 +90,8 @@ jobs:
                   value: ${AWS_SECRET_ACCESS_KEY}
                 - name: AWS_DEFAULT_REGION
                   value: ${AWS_DEFAULT_REGION}
+              interactiveMode: Never
+              provideClusterInfo: true
         EOF
         echo "Setting kubeconfig permissions..."
         chmod 600 ${{ env.KUBECONFIG }}
@@ -122,6 +124,10 @@ jobs:
         echo ${{ env.KUBECONFIG }}
         echo "Kubeconfig exists:"
         ls -la ${{ env.KUBECONFIG }}
+        echo "Testing AWS credentials..."
+        aws sts get-caller-identity
+        echo "Getting EKS token..."
+        aws eks get-token --cluster-name ${{ env.CLUSTER_NAME }}
         echo "Kubectl config view output:"
         kubectl --kubeconfig=${{ env.KUBECONFIG }} config view
         echo "Getting nodes:"
