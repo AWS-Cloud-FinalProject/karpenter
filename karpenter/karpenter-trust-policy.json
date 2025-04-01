@@ -1,0 +1,17 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Principal": {
+        "Federated": "arn:aws:iam::688567288847:oidc-provider/oidc.eks.us-west-2.amazonaws.com/id/51BBC0043160FACE9EFDE807DE3D1070"
+      },
+      "Action": "sts:AssumeRoleWithWebIdentity",
+      "Condition": {
+        "StringEquals": {
+          "oidc.eks.us-west-2.amazonaws.com/id/51BBC0043160FACE9EFDE807DE3D1070:sub": "system:serviceaccount:karpenter:karpenter"
+        }
+      }
+    }
+  ]
+} 

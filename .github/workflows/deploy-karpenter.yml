@@ -10,6 +10,8 @@ env:
   CLUSTER_NAME: wiary
   KARPENTER_VERSION: 0.16.3
   KUBECONFIG: /home/runner/.kube/config
+  KARPENTER_ROLE_NAME: KarpenterNodeInstanceRole
+  AWS_ACCOUNT_ID: 688567288847
 
 jobs:
   deploy:
@@ -23,6 +25,26 @@ jobs:
         aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
         aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
         aws-region: ${{ env.AWS_REGION }}
+
+    - name: Create IAM Role
+      run: |
+        # Create the IAM role with trust policy
+        aws iam create-role \
+          --role-name ${{ env.KARPENTER_ROLE_NAME }} \
+          --assume-role-policy-document file://karpenter/karpenter-trust-policy.json
+
+        # Attach required policies
+        aws iam attach-role-policy \
+          --role-name ${{ env.KARPENTER_ROLE_NAME }} \
+          --policy-arn arn:aws:iam::aws:policy/AmazonEKSWorkerNodePolicy
+
+        aws iam attach-role-policy \
+          --role-name ${{ env.KARPENTER_ROLE_NAME }} \
+          --policy-arn arn:aws:iam::aws:policy/AmazonEKS_CNI_Policy
+
+        aws iam attach-role-policy \
+          --role-name ${{ env.KARPENTER_ROLE_NAME }} \
+          --policy-arn arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly
 
     - name: Install kubectl
       run: |
@@ -86,6 +108,13 @@ jobs:
         TOKEN=$(aws eks get-token --cluster-name ${{ env.CLUSTER_NAME }} --query 'status.token' --output text)
         kubectl --token=$TOKEN create namespace karpenter --dry-run=client -o yaml | kubectl --token=$TOKEN apply -f -
 
+    - name: Create ServiceAccount
+      run: |
+        TOKEN=$(aws eks get-token --cluster-name ${{ env.CLUSTER_NAME }} --query 'status.token' --output text)
+        # Update the role ARN in the ServiceAccount manifest
+        sed -i "s|688567288847|${{ env.AWS_ACCOUNT_ID }}|g" karpenter/sa.yaml
+        kubectl --token=$TOKEN apply -f karpenter/sa.yaml
+
     - name: Prepare Helm values
       run: |
         # Get values from secret
@@ -122,7 +151,7 @@ jobs:
     - name: Apply Provisioner
       run: |
         TOKEN=$(aws eks get-token --cluster-name ${{ env.CLUSTER_NAME }} --query 'status.token' --output text)
-        kubectl --token=$TOKEN apply -f provisioner/default-provisioner.yaml -n karpenter
+        kubectl --token=$TOKEN apply -f karpenter/karpenter-provisioner.yaml
 
     - name: Apply HPA
       run: |
