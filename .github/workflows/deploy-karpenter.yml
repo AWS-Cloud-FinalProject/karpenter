@@ -29,10 +29,6 @@ jobs:
           echo "Error: AWS_SECRET_ACCESS_KEY secret is not set"
           exit 1
         fi
-        if [ -z "${{ secrets.ASG_NAME }}" ]; then
-          echo "Error: ASG_NAME secret is not set"
-          exit 1
-        fi
 
     - name: Configure AWS credentials
       uses: aws-actions/configure-aws-credentials@v1
@@ -193,11 +189,3 @@ jobs:
       run: |
         TOKEN=$(aws eks get-token --cluster-name ${{ env.CLUSTER_NAME }} --query 'status.token' --output text)
         kubectl --token=$TOKEN apply -f karpenter/karpenter-provisioner.yaml
-
-    - name: Update ASG
-      run: |
-        aws autoscaling update-auto-scaling-group \
-          --auto-scaling-group-name ${{ secrets.ASG_NAME }} \
-          --min-size 1 \
-          --max-size 1 \
-          --desired-capacity 1
