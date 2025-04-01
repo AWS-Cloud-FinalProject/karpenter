@@ -35,6 +35,8 @@ jobs:
         mkdir -p /home/runner/.kube
         CLUSTER_ENDPOINT=$(aws eks describe-cluster --name ${{ env.CLUSTER_NAME }} --query "cluster.endpoint" --output text)
         CERTIFICATE_DATA=$(aws eks describe-cluster --name ${{ env.CLUSTER_NAME }} --query "cluster.certificateAuthority.data" --output text)
+        echo "Cluster endpoint: $CLUSTER_ENDPOINT"
+        echo "Certificate data: $CERTIFICATE_DATA"
         cat > ${{ env.KUBECONFIG }} << EOF
         apiVersion: v1
         kind: Config
@@ -76,6 +78,7 @@ jobs:
       run: |
         aws sts get-caller-identity
         TOKEN=$(aws eks get-token --cluster-name ${{ env.CLUSTER_NAME }} --query 'status.token' --output text)
+        echo "Token: $TOKEN"
         kubectl --token=$TOKEN get nodes
 
     - name: Create namespace
