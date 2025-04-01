@@ -47,45 +47,9 @@ jobs:
         AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
         AWS_DEFAULT_REGION: ${{ env.AWS_REGION }}
       run: |
-        CLUSTER_ENDPOINT=$(aws eks describe-cluster --name ${{ env.CLUSTER_NAME }} --query "cluster.endpoint" --output text)
-        CERTIFICATE_DATA=$(aws eks describe-cluster --name ${{ env.CLUSTER_NAME }} --query "cluster.certificateAuthority.data" --output text)
-        mkdir -p ~/.kube
-        cat > ~/.kube/config << EOF
-        apiVersion: v1
-        kind: Config
-        clusters:
-        - cluster:
-            server: $CLUSTER_ENDPOINT
-            certificate-authority-data: $CERTIFICATE_DATA
-          name: ${{ env.CLUSTER_NAME }}
-        contexts:
-        - context:
-            cluster: ${{ env.CLUSTER_NAME }}
-            user: aws
-          name: aws
-        current-context: aws
-        preferences: {}
-        users:
-        - name: aws
-          user:
-            exec:
-              apiVersion: client.authentication.k8s.io/v1beta1
-              command: aws
-              args:
-                - eks
-                - get-token
-                - --cluster-name
-                - ${{ env.CLUSTER_NAME }}
-              env:
-                - name: AWS_ACCESS_KEY_ID
-                  value: ${{ secrets.AWS_ACCESS_KEY_ID }}
-                - name: AWS_SECRET_ACCESS_KEY
-                  value: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-                - name: AWS_DEFAULT_REGION
-                  value: ${{ env.AWS_REGION }}
-        EOF
-        chmod 600 ~/.kube/config
+        aws eks update-kubeconfig --name ${{ env.CLUSTER_NAME }} --region ${{ env.AWS_REGION }}
         export KUBECONFIG=~/.kube/config
+        chmod 600 ~/.kube/config
 
     - name: Verify cluster access
       env:
@@ -94,6 +58,8 @@ jobs:
         AWS_DEFAULT_REGION: ${{ env.AWS_REGION }}
         KUBECONFIG: ~/.kube/config
       run: |
+        aws eks describe-cluster --name ${{ env.CLUSTER_NAME }} --query "cluster.endpoint" --output text
+        aws eks describe-cluster --name ${{ env.CLUSTER_NAME }} --query "cluster.certificateAuthority.data" --output text
         kubectl config view
         kubectl get nodes
 
