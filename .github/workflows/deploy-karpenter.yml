@@ -9,7 +9,7 @@ env:
   AWS_REGION: us-west-2
   CLUSTER_NAME: wiary
   KARPENTER_VERSION: 0.16.3
-  KUBECONFIG: ~/.kube/config
+  KUBECONFIG: /home/runner/.kube/config
 
 jobs:
   deploy:
@@ -50,23 +50,24 @@ jobs:
         KUBECONFIG: ${{ env.KUBECONFIG }}
       run: |
         echo "Creating .kube directory..."
-        mkdir -p ~/.kube
+        mkdir -p /home/runner/.kube
         echo "Getting cluster endpoint..."
         CLUSTER_ENDPOINT=$(aws eks describe-cluster --name ${{ env.CLUSTER_NAME }} --query "cluster.endpoint" --output text)
+        echo "Cluster endpoint: $CLUSTER_ENDPOINT"
         echo "Getting certificate data..."
         CERTIFICATE_DATA=$(aws eks describe-cluster --name ${{ env.CLUSTER_NAME }} --query "cluster.certificateAuthority.data" --output text)
         echo "Creating kubeconfig file..."
-        cat > ${{ env.KUBECONFIG }} << EOF
+        cat > ${{ env.KUBECONFIG }} << 'EOF'
         apiVersion: v1
         kind: Config
         clusters:
         - cluster:
-            server: $CLUSTER_ENDPOINT
-            certificate-authority-data: $CERTIFICATE_DATA
-          name: ${{ env.CLUSTER_NAME }}
+            server: ${CLUSTER_ENDPOINT}
+            certificate-authority-data: ${CERTIFICATE_DATA}
+          name: ${CLUSTER_NAME}
         contexts:
         - context:
-            cluster: ${{ env.CLUSTER_NAME }}
+            cluster: ${CLUSTER_NAME}
             user: aws
           name: aws
         current-context: aws
@@ -81,20 +82,29 @@ jobs:
                 - eks
                 - get-token
                 - --cluster-name
-                - ${{ env.CLUSTER_NAME }}
+                - ${CLUSTER_NAME}
               env:
                 - name: AWS_ACCESS_KEY_ID
-                  value: ${{ secrets.AWS_ACCESS_KEY_ID }}
+                  value: ${AWS_ACCESS_KEY_ID}
                 - name: AWS_SECRET_ACCESS_KEY
-                  value: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+                  value: ${AWS_SECRET_ACCESS_KEY}
                 - name: AWS_DEFAULT_REGION
-                  value: ${{ env.AWS_REGION }}
+                  value: ${AWS_DEFAULT_REGION}
         EOF
         echo "Setting kubeconfig permissions..."
         chmod 600 ${{ env.KUBECONFIG }}
         echo "Verifying kubeconfig file exists..."
         ls -la ${{ env.KUBECONFIG }}
         echo "Kubeconfig file contents:"
+        cat ${{ env.KUBECONFIG }}
+        echo "Replacing variables in kubeconfig..."
+        sed -i "s|\${CLUSTER_ENDPOINT}|$CLUSTER_ENDPOINT|g" ${{ env.KUBECONFIG }}
+        sed -i "s|\${CERTIFICATE_DATA}|$CERTIFICATE_DATA|g" ${{ env.KUBECONFIG }}
+        sed -i "s|\${CLUSTER_NAME}|${{ env.CLUSTER_NAME }}|g" ${{ env.KUBECONFIG }}
+        sed -i "s|\${AWS_ACCESS_KEY_ID}|${{ secrets.AWS_ACCESS_KEY_ID }}|g" ${{ env.KUBECONFIG }}
+        sed -i "s|\${AWS_SECRET_ACCESS_KEY}|${{ secrets.AWS_SECRET_ACCESS_KEY }}|g" ${{ env.KUBECONFIG }}
+        sed -i "s|\${AWS_DEFAULT_REGION}|${{ env.AWS_REGION }}|g" ${{ env.KUBECONFIG }}
+        echo "Final kubeconfig contents:"
         cat ${{ env.KUBECONFIG }}
 
     - name: Verify cluster access
