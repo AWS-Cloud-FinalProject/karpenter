@@ -81,22 +81,25 @@ jobs:
     - name: Verify cluster access
       run: |
         aws sts get-caller-identity
-        kubectl get nodes
+        TOKEN=$(aws eks get-token --cluster-name ${{ env.CLUSTER_NAME }} --query 'status.token' --output text)
+        kubectl --token=$TOKEN get nodes
 
     - name: Create namespace
       run: |
-        kubectl create namespace karpenter --dry-run=client -o yaml | kubectl apply -f -
+        TOKEN=$(aws eks get-token --cluster-name ${{ env.CLUSTER_NAME }} --query 'status.token' --output text)
+        kubectl --token=$TOKEN create namespace karpenter --dry-run=client -o yaml | kubectl --token=$TOKEN apply -f -
 
     - name: Prepare Helm values
       run: |
         # Get values from secret
-        CLUSTER_NAME=$(kubectl get secret karpenter-config -n karpenter -o jsonpath='{.data.cluster-name}' | base64 -d)
-        CLUSTER_ENDPOINT=$(kubectl get secret karpenter-config -n karpenter -o jsonpath='{.data.cluster-endpoint}' | base64 -d)
-        AWS_REGION=$(kubectl get secret karpenter-config -n karpenter -o jsonpath='{.data.aws-region}' | base64 -d)
-        AWS_DEFAULT_REGION=$(kubectl get secret karpenter-config -n karpenter -o jsonpath='{.data.aws-default-region}' | base64 -d)
-        INSTANCE_PROFILE=$(kubectl get secret karpenter-config -n karpenter -o jsonpath='{.data.instance-profile}' | base64 -d)
-        SERVICE_LINKED_ROLE=$(kubectl get secret karpenter-config -n karpenter -o jsonpath='{.data.service-linked-role}' | base64 -d)
-        NODE_ROLE=$(kubectl get secret karpenter-config -n karpenter -o jsonpath='{.data.node-role}' | base64 -d)
+        TOKEN=$(aws eks get-token --cluster-name ${{ env.CLUSTER_NAME }} --query 'status.token' --output text)
+        CLUSTER_NAME=$(kubectl --token=$TOKEN get secret karpenter-config -n karpenter -o jsonpath='{.data.cluster-name}' | base64 -d)
+        CLUSTER_ENDPOINT=$(kubectl --token=$TOKEN get secret karpenter-config -n karpenter -o jsonpath='{.data.cluster-endpoint}' | base64 -d)
+        AWS_REGION=$(kubectl --token=$TOKEN get secret karpenter-config -n karpenter -o jsonpath='{.data.aws-region}' | base64 -d)
+        AWS_DEFAULT_REGION=$(kubectl --token=$TOKEN get secret karpenter-config -n karpenter -o jsonpath='{.data.aws-default-region}' | base64 -d)
+        INSTANCE_PROFILE=$(kubectl --token=$TOKEN get secret karpenter-config -n karpenter -o jsonpath='{.data.instance-profile}' | base64 -d)
+        SERVICE_LINKED_ROLE=$(kubectl --token=$TOKEN get secret karpenter-config -n karpenter -o jsonpath='{.data.service-linked-role}' | base64 -d)
+        NODE_ROLE=$(kubectl --token=$TOKEN get secret karpenter-config -n karpenter -o jsonpath='{.data.node-role}' | base64 -d)
 
         # Replace variables in values.yaml
         sed -i "s|\${KARPENTER_CLUSTER_NAME}|$CLUSTER_NAME|g" karpenter/values.yaml
@@ -109,21 +112,25 @@ jobs:
 
     - name: Install Karpenter
       run: |
+        TOKEN=$(aws eks get-token --cluster-name ${{ env.CLUSTER_NAME }} --query 'status.token' --output text)
         helm repo add karpenter https://charts.karpenter.sh
         helm repo update
         helm install karpenter karpenter/karpenter \
           --namespace karpenter \
           --create-namespace \
           --version ${{ env.KARPENTER_VERSION }} \
-          -f karpenter/values.yaml
+          -f karpenter/values.yaml \
+          --kube-token=$TOKEN
 
     - name: Apply Provisioner
       run: |
-        kubectl apply -f provisioner/default-provisioner.yaml -n karpenter
+        TOKEN=$(aws eks get-token --cluster-name ${{ env.CLUSTER_NAME }} --query 'status.token' --output text)
+        kubectl --token=$TOKEN apply -f provisioner/default-provisioner.yaml -n karpenter
 
     - name: Apply HPA
       run: |
-        kubectl apply -f hpa/ -n karpenter
+        TOKEN=$(aws eks get-token --cluster-name ${{ env.CLUSTER_NAME }} --query 'status.token' --output text)
+        kubectl --token=$TOKEN apply -f hpa/ -n karpenter
 
     - name: Update ASG
       run: |
