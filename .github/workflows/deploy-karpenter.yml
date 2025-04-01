@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
 
 env:
-  AWS_REGION: us-west-2  # 변경 필요
+  AWS_REGION: us-west-2
   CLUSTER_NAME: wiary
   KARPENTER_VERSION: 0.16.3
 
@@ -35,13 +35,21 @@ jobs:
         unzip awscliv2.zip
         sudo ./aws/install --update
 
+    - name: Configure AWS CLI
+      run: |
+        aws configure set aws_access_key_id ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws configure set aws_secret_access_key ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws configure set region ${{ env.AWS_REGION }}
+
     - name: Update kube config
       run: |
         aws eks update-kubeconfig --name ${{ env.CLUSTER_NAME }} --region ${{ env.AWS_REGION }}
         export KUBECONFIG=~/.kube/config
+        chmod 600 ~/.kube/config
 
     - name: Verify cluster access
       run: |
+        aws eks get-token --cluster-name ${{ env.CLUSTER_NAME }} --region ${{ env.AWS_REGION }}
         kubectl get nodes
 
     - name: Install Karpenter
