@@ -8,7 +8,7 @@ on:
 env:
   KUBECONFIG: ${{ secrets.KUBECONFIG }}
   AWS_REGION: us-west-2  # 변경 필요
-  CLUSTER_NAME: your-cluster-name  # 변경 필요
+  CLUSTER_NAME: wiray  # 변경 필요
   KARPENTER_VERSION: v0.32.1
 
 jobs:
