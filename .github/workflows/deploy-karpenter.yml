@@ -19,6 +19,21 @@ jobs:
     steps:
     - uses: actions/checkout@v3
 
+    - name: Validate required secrets
+      run: |
+        if [ -z "${{ secrets.AWS_ACCESS_KEY_ID }}" ]; then
+          echo "Error: AWS_ACCESS_KEY_ID secret is not set"
+          exit 1
+        fi
+        if [ -z "${{ secrets.AWS_SECRET_ACCESS_KEY }}" ]; then
+          echo "Error: AWS_SECRET_ACCESS_KEY secret is not set"
+          exit 1
+        fi
+        if [ -z "${{ secrets.ASG_NAME }}" ]; then
+          echo "Error: ASG_NAME secret is not set"
+          exit 1
+        fi
+
     - name: Configure AWS credentials
       uses: aws-actions/configure-aws-credentials@v1
       with:
@@ -28,23 +43,28 @@ jobs:
 
     - name: Create IAM Role
       run: |
-        # Create the IAM role with trust policy
-        aws iam create-role \
-          --role-name ${{ env.KARPENTER_ROLE_NAME }} \
-          --assume-role-policy-document file://karpenter/karpenter-trust-policy.json
+        # Check if role exists
+        if aws iam get-role --role-name ${{ env.KARPENTER_ROLE_NAME }} 2>/dev/null; then
+          echo "Role ${{ env.KARPENTER_ROLE_NAME }} already exists"
+        else
+          # Create the IAM role with trust policy
+          aws iam create-role \
+            --role-name ${{ env.KARPENTER_ROLE_NAME }} \
+            --assume-role-policy-document file://karpenter/karpenter-trust-policy.json
 
-        # Attach required policies
-        aws iam attach-role-policy \
-          --role-name ${{ env.KARPENTER_ROLE_NAME }} \
-          --policy-arn arn:aws:iam::aws:policy/AmazonEKSWorkerNodePolicy
+          # Attach required policies
+          aws iam attach-role-policy \
+            --role-name ${{ env.KARPENTER_ROLE_NAME }} \
+            --policy-arn arn:aws:iam::aws:policy/AmazonEKSWorkerNodePolicy
 
-        aws iam attach-role-policy \
-          --role-name ${{ env.KARPENTER_ROLE_NAME }} \
-          --policy-arn arn:aws:iam::aws:policy/AmazonEKS_CNI_Policy
+          aws iam attach-role-policy \
+            --role-name ${{ env.KARPENTER_ROLE_NAME }} \
+            --policy-arn arn:aws:iam::aws:policy/AmazonEKS_CNI_Policy
 
-        aws iam attach-role-policy \
-          --role-name ${{ env.KARPENTER_ROLE_NAME }} \
-          --policy-arn arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly
+          aws iam attach-role-policy \
+            --role-name ${{ env.KARPENTER_ROLE_NAME }} \
+            --policy-arn arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly
+        fi
 
     - name: Install kubectl
       run: |
@@ -115,6 +135,27 @@ jobs:
         sed -i "s|688567288847|${{ env.AWS_ACCOUNT_ID }}|g" karpenter/sa.yaml
         kubectl --token=$TOKEN apply -f karpenter/sa.yaml
 
+    - name: Create Karpenter Secret
+      run: |
+        TOKEN=$(aws eks get-token --cluster-name ${{ env.CLUSTER_NAME }} --query 'status.token' --output text)
+        # Create secret with required values
+        cat << EOF | kubectl --token=$TOKEN apply -f -
+        apiVersion: v1
+        kind: Secret
+        metadata:
+          name: karpenter-config
+          namespace: karpenter
+        type: Opaque
+        stringData:
+          cluster-name: ${{ env.CLUSTER_NAME }}
+          cluster-endpoint: $(aws eks describe-cluster --name ${{ env.CLUSTER_NAME }} --query "cluster.endpoint" --output text)
+          aws-region: ${{ env.AWS_REGION }}
+          aws-default-region: ${{ env.AWS_REGION }}
+          instance-profile: ${{ env.KARPENTER_ROLE_NAME }}
+          service-linked-role: "true"
+          node-role: ${{ env.KARPENTER_ROLE_NAME }}
+        EOF
+
     - name: Prepare Helm values
       run: |
         # Get values from secret
@@ -152,11 +193,6 @@ jobs:
       run: |
         TOKEN=$(aws eks get-token --cluster-name ${{ env.CLUSTER_NAME }} --query 'status.token' --output text)
         kubectl --token=$TOKEN apply -f karpenter/karpenter-provisioner.yaml
-
-    - name: Apply HPA
-      run: |
-        TOKEN=$(aws eks get-token --cluster-name ${{ env.CLUSTER_NAME }} --query 'status.token' --output text)
-        kubectl --token=$TOKEN apply -f hpa/ -n karpenter
 
     - name: Update ASG
       run: |
