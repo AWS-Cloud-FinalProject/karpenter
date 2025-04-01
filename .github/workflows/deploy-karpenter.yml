@@ -35,12 +35,19 @@ jobs:
         unzip awscliv2.zip
         sudo ./aws/install
 
+    - name: Configure AWS CLI
+      run: |
+        aws configure set region ${{ env.AWS_REGION }}
+        aws configure set output json
+
     - name: Update kube config
       run: |
         aws eks update-kubeconfig --name ${{ env.CLUSTER_NAME }} --region ${{ env.AWS_REGION }}
+        export KUBECONFIG=~/.kube/config
 
     - name: Verify cluster access
       run: |
+        kubectl config get-contexts
         kubectl get nodes
 
     - name: Install Karpenter
