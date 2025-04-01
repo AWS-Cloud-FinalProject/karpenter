@@ -37,70 +37,22 @@ jobs:
         sudo ./aws/install --update
 
     - name: Setup kubeconfig
-      env:
-        AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-        AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-        AWS_DEFAULT_REGION: ${{ env.AWS_REGION }}
-        KUBECONFIG: ${{ env.KUBECONFIG }}
       run: |
-        echo "Creating .kube directory..."
         mkdir -p /home/runner/.kube
-        echo "Getting cluster endpoint..."
-        CLUSTER_ENDPOINT=$(aws eks describe-cluster --name ${{ env.CLUSTER_NAME }} --query "cluster.endpoint" --output text)
-        echo "Getting certificate data..."
-        CERTIFICATE_DATA=$(aws eks describe-cluster --name ${{ env.CLUSTER_NAME }} --query "cluster.certificateAuthority.data" --output text)
-        echo "Creating kubeconfig file..."
-        cat > ${{ env.KUBECONFIG }} << EOF
-        apiVersion: v1
-        kind: Config
-        clusters:
-        - cluster:
-            server: ${CLUSTER_ENDPOINT}
-            certificate-authority-data: ${CERTIFICATE_DATA}
-          name: ${CLUSTER_NAME}
-        contexts:
-        - context:
-            cluster: ${CLUSTER_NAME}
-            user: aws
-          name: aws
-        current-context: aws
-        preferences: {}
-        users:
-        - name: aws
-          user:
-            exec:
-              apiVersion: client.authentication.k8s.io/v1beta1
-              command: aws
-              args:
-                - eks
-                - get-token
-                - --cluster-name
-                - ${CLUSTER_NAME}
-              env:
-                - name: AWS_ACCESS_KEY_ID
-                  value: ${AWS_ACCESS_KEY_ID}
-                - name: AWS_SECRET_ACCESS_KEY
-                  value: ${AWS_SECRET_ACCESS_KEY}
-                - name: AWS_DEFAULT_REGION
-                  value: ${AWS_DEFAULT_REGION}
-              interactiveMode: Never
-              provideClusterInfo: true
-        EOF
-        echo "Setting kubeconfig permissions..."
+        aws eks update-kubeconfig --name ${{ env.CLUSTER_NAME }} --region ${{ env.AWS_REGION }}
         chmod 600 ${{ env.KUBECONFIG }}
-        echo "Verifying kubeconfig file exists..."
-        ls -la ${{ env.KUBECONFIG }}
-        echo "Testing AWS credentials..."
+
+    - name: Verify cluster access
+      run: |
         aws sts get-caller-identity
-        echo "Testing kubectl access..."
         kubectl get nodes
 
+    - name: Prepare Helm values
+      run: |
+        CLUSTER_ENDPOINT=$(aws eks describe-cluster --name ${{ env.CLUSTER_NAME }} --query "cluster.endpoint" --output text)
+        sed -i "s|\${CLUSTER_ENDPOINT}|$CLUSTER_ENDPOINT|g" karpenter/values.yaml
+
     - name: Install Karpenter
-      env:
-        AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-        AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-        AWS_DEFAULT_REGION: ${{ env.AWS_REGION }}
-        KUBECONFIG: ${{ env.KUBECONFIG }}
       run: |
         helm repo add karpenter https://charts.karpenter.sh
         helm repo update
@@ -108,35 +60,13 @@ jobs:
           --namespace karpenter \
           --create-namespace \
           --version ${{ env.KARPENTER_VERSION }} \
-          --set controller.clusterName=${{ env.CLUSTER_NAME }} \
-          --set controller.clusterEndpoint=$(aws eks describe-cluster --name ${{ env.CLUSTER_NAME }} --query "cluster.endpoint" --output text) \
-          --set controller.aws.defaultInstanceProfile=KarpenterNodeInstanceProfile \
-          --set controller.aws.useServiceLinkedRole=true \
-          --set controller.podAnnotations."iam\.amazonaws\.com/role=KarpenterNodeInstanceRole" \
-          --set controller.env[0].name=AWS_REGION \
-          --set controller.env[0].value=${{ env.AWS_REGION }} \
-          --set controller.env[1].name=AWS_DEFAULT_REGION \
-          --set controller.env[1].value=${{ env.AWS_REGION }} \
-          --set controller.env[2].name=CLUSTER_NAME \
-          --set controller.env[2].value=${{ env.CLUSTER_NAME }} \
-          --set controller.env[3].name=CLUSTER_ENDPOINT \
-          --set controller.env[3].value=$(aws eks describe-cluster --name ${{ env.CLUSTER_NAME }} --query "cluster.endpoint" --output text)
+          -f karpenter/values.yaml
 
     - name: Apply Provisioner
-      env:
-        AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-        AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-        AWS_DEFAULT_REGION: ${{ env.AWS_REGION }}
-        KUBECONFIG: ${{ env.KUBECONFIG }}
       run: |
         kubectl apply -f provisioner/default-provisioner.yaml -n karpenter
 
     - name: Apply HPA
-      env:
-        AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-        AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-        AWS_DEFAULT_REGION: ${{ env.AWS_REGION }}
-        KUBECONFIG: ${{ env.KUBECONFIG }}
       run: |
         kubectl apply -f hpa/ -n karpenter
 
