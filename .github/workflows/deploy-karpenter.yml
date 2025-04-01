@@ -111,13 +111,18 @@ jobs:
               interactiveMode: Never
         EOF
         chmod 600 ${{ env.KUBECONFIG }}
+        echo "Kubeconfig file created at ${{ env.KUBECONFIG }}"
+        cat ${{ env.KUBECONFIG }}
 
     - name: Verify cluster access
       run: |
         aws sts get-caller-identity
         TOKEN=$(aws eks get-token --cluster-name ${{ env.CLUSTER_NAME }} --query 'status.token' --output text)
         echo "Token: $TOKEN"
+        echo "Testing cluster access..."
         kubectl --token=$TOKEN get nodes
+        echo "Testing cluster API access..."
+        kubectl --token=$TOKEN api-resources
 
     - name: Create namespace
       run: |
