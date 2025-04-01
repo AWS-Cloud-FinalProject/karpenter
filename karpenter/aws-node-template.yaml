@@ -1,0 +1,17 @@
+apiVersion: karpenter.k8s.aws/v1alpha1
+kind: AWSNodeTemplate
+metadata:
+  name: default
+  namespace: karpenter
+spec:
+  metadataOptions:
+    httpEndpoint: enabled
+    httpProtocolIPv6: disabled
+    httpPutResponseHopLimit: 2
+    httpTokens: required
+  securityGroupSelector:
+    karpenter.sh/discovery: "true"
+  subnetSelector:
+    karpenter.sh/discovery: "true"
+  tags:
+    karpenter.sh/discovery: "true" 
