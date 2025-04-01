@@ -45,8 +45,47 @@ jobs:
       run: |
         echo "Creating .kube directory..."
         mkdir -p /home/runner/.kube
-        echo "Updating kubeconfig with AWS CLI..."
-        aws eks update-kubeconfig --name ${{ env.CLUSTER_NAME }} --region ${{ env.AWS_REGION }}
+        echo "Getting cluster endpoint..."
+        CLUSTER_ENDPOINT=$(aws eks describe-cluster --name ${{ env.CLUSTER_NAME }} --query "cluster.endpoint" --output text)
+        echo "Getting certificate data..."
+        CERTIFICATE_DATA=$(aws eks describe-cluster --name ${{ env.CLUSTER_NAME }} --query "cluster.certificateAuthority.data" --output text)
+        echo "Creating kubeconfig file..."
+        cat > ${{ env.KUBECONFIG }} << EOF
+        apiVersion: v1
+        kind: Config
+        clusters:
+        - cluster:
+            server: ${CLUSTER_ENDPOINT}
+            certificate-authority-data: ${CERTIFICATE_DATA}
+          name: ${CLUSTER_NAME}
+        contexts:
+        - context:
+            cluster: ${CLUSTER_NAME}
+            user: aws
+          name: aws
+        current-context: aws
+        preferences: {}
+        users:
+        - name: aws
+          user:
+            exec:
+              apiVersion: client.authentication.k8s.io/v1beta1
+              command: aws
+              args:
+                - eks
+                - get-token
+                - --cluster-name
+                - ${CLUSTER_NAME}
+              env:
+                - name: AWS_ACCESS_KEY_ID
+                  value: ${AWS_ACCESS_KEY_ID}
+                - name: AWS_SECRET_ACCESS_KEY
+                  value: ${AWS_SECRET_ACCESS_KEY}
+                - name: AWS_DEFAULT_REGION
+                  value: ${AWS_DEFAULT_REGION}
+              interactiveMode: Never
+              provideClusterInfo: true
+        EOF
         echo "Setting kubeconfig permissions..."
         chmod 600 ${{ env.KUBECONFIG }}
         echo "Verifying kubeconfig file exists..."
