@@ -52,7 +52,19 @@ jobs:
           --namespace karpenter \
           --create-namespace \
           --version ${{ env.KARPENTER_VERSION }} \
-          --set serviceAccount.annotations."eks\.amazonaws\.com/role-arn"=${{ secrets.KARPENTER_IAM_ROLE_ARN }}
+          --set controller.clusterName=${{ env.CLUSTER_NAME }} \
+          --set controller.clusterEndpoint=$(aws eks describe-cluster --name ${{ env.CLUSTER_NAME }} --query "cluster.endpoint" --output text) \
+          --set controller.aws.defaultInstanceProfile=KarpenterNodeInstanceProfile \
+          --set controller.aws.useServiceLinkedRole=true \
+          --set controller.podAnnotations."iam\.amazonaws\.com/role=KarpenterNodeInstanceRole" \
+          --set controller.env[0].name=AWS_REGION \
+          --set controller.env[0].value=${{ env.AWS_REGION }} \
+          --set controller.env[1].name=AWS_DEFAULT_REGION \
+          --set controller.env[1].value=${{ env.AWS_REGION }} \
+          --set controller.env[2].name=CLUSTER_NAME \
+          --set controller.env[2].value=${{ env.CLUSTER_NAME }} \
+          --set controller.env[3].name=CLUSTER_ENDPOINT \
+          --set controller.env[3].value=$(aws eks describe-cluster --name ${{ env.CLUSTER_NAME }} --query "cluster.endpoint" --output text)
 
     - name: Apply Provisioner
       run: |
