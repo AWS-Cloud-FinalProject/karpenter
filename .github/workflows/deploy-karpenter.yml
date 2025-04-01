@@ -51,62 +51,13 @@ jobs:
       run: |
         echo "Creating .kube directory..."
         mkdir -p /home/runner/.kube
-        echo "Getting cluster endpoint..."
-        CLUSTER_ENDPOINT=$(aws eks describe-cluster --name ${{ env.CLUSTER_NAME }} --query "cluster.endpoint" --output text)
-        echo "Cluster endpoint: $CLUSTER_ENDPOINT"
-        echo "Getting certificate data..."
-        CERTIFICATE_DATA=$(aws eks describe-cluster --name ${{ env.CLUSTER_NAME }} --query "cluster.certificateAuthority.data" --output text)
-        echo "Creating kubeconfig file..."
-        cat > ${{ env.KUBECONFIG }} << 'EOF'
-        apiVersion: v1
-        kind: Config
-        clusters:
-        - cluster:
-            server: ${CLUSTER_ENDPOINT}
-            certificate-authority-data: ${CERTIFICATE_DATA}
-          name: ${CLUSTER_NAME}
-        contexts:
-        - context:
-            cluster: ${CLUSTER_NAME}
-            user: aws
-          name: aws
-        current-context: aws
-        preferences: {}
-        users:
-        - name: aws
-          user:
-            exec:
-              apiVersion: client.authentication.k8s.io/v1beta1
-              command: aws
-              args:
-                - eks
-                - get-token
-                - --cluster-name
-                - ${CLUSTER_NAME}
-              env:
-                - name: AWS_ACCESS_KEY_ID
-                  value: ${AWS_ACCESS_KEY_ID}
-                - name: AWS_SECRET_ACCESS_KEY
-                  value: ${AWS_SECRET_ACCESS_KEY}
-                - name: AWS_DEFAULT_REGION
-                  value: ${AWS_DEFAULT_REGION}
-              interactiveMode: Never
-              provideClusterInfo: false
-        EOF
+        echo "Updating kubeconfig with AWS CLI..."
+        aws eks update-kubeconfig --name ${{ env.CLUSTER_NAME }} --region ${{ env.AWS_REGION }}
         echo "Setting kubeconfig permissions..."
         chmod 600 ${{ env.KUBECONFIG }}
         echo "Verifying kubeconfig file exists..."
         ls -la ${{ env.KUBECONFIG }}
         echo "Kubeconfig file contents:"
-        cat ${{ env.KUBECONFIG }}
-        echo "Replacing variables in kubeconfig..."
-        sed -i "s|\${CLUSTER_ENDPOINT}|$CLUSTER_ENDPOINT|g" ${{ env.KUBECONFIG }}
-        sed -i "s|\${CERTIFICATE_DATA}|$CERTIFICATE_DATA|g" ${{ env.KUBECONFIG }}
-        sed -i "s|\${CLUSTER_NAME}|${{ env.CLUSTER_NAME }}|g" ${{ env.KUBECONFIG }}
-        sed -i "s|\${AWS_ACCESS_KEY_ID}|${{ secrets.AWS_ACCESS_KEY_ID }}|g" ${{ env.KUBECONFIG }}
-        sed -i "s|\${AWS_SECRET_ACCESS_KEY}|${{ secrets.AWS_SECRET_ACCESS_KEY }}|g" ${{ env.KUBECONFIG }}
-        sed -i "s|\${AWS_DEFAULT_REGION}|${{ env.AWS_REGION }}|g" ${{ env.KUBECONFIG }}
-        echo "Final kubeconfig contents:"
         cat ${{ env.KUBECONFIG }}
 
     - name: Verify cluster access
@@ -132,8 +83,8 @@ jobs:
         export AWS_ACCESS_KEY_ID=${{ secrets.AWS_ACCESS_KEY_ID }}
         export AWS_SECRET_ACCESS_KEY=${{ secrets.AWS_SECRET_ACCESS_KEY }}
         export AWS_DEFAULT_REGION=${{ env.AWS_REGION }}
-        echo "Testing kubectl with AWS CLI..."
-        aws eks get-token --cluster-name ${{ env.CLUSTER_NAME }} | kubectl --kubeconfig=${{ env.KUBECONFIG }} get nodes --token=$(aws eks get-token --cluster-name ${{ env.CLUSTER_NAME }} --query 'status.token' --output text)
+        echo "Testing kubectl access..."
+        kubectl --kubeconfig=${{ env.KUBECONFIG }} get nodes
 
     - name: Install Karpenter
       env:
