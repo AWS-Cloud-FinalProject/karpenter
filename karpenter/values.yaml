@@ -1,17 +1,17 @@
 controller:
-  clusterName: wiary
-  clusterEndpoint: ${CLUSTER_ENDPOINT}
+  clusterName: ${KARPENTER_CLUSTER_NAME}
+  clusterEndpoint: ${KARPENTER_CLUSTER_ENDPOINT}
   aws:
-    defaultInstanceProfile: KarpenterNodeInstanceProfile
-    useServiceLinkedRole: true
+    defaultInstanceProfile: ${KARPENTER_INSTANCE_PROFILE}
+    useServiceLinkedRole: ${KARPENTER_SERVICE_LINKED_ROLE}
   podAnnotations:
-    iam.amazonaws.com/role: KarpenterNodeInstanceRole
+    iam.amazonaws.com/role: ${KARPENTER_NODE_ROLE}
   env:
     - name: AWS_REGION
-      value: us-west-2
+      value: ${KARPENTER_AWS_REGION}
     - name: AWS_DEFAULT_REGION
-      value: us-west-2
+      value: ${KARPENTER_AWS_DEFAULT_REGION}
     - name: CLUSTER_NAME
-      value: wiary
+      value: ${KARPENTER_CLUSTER_NAME}
     - name: CLUSTER_ENDPOINT
-      value: ${CLUSTER_ENDPOINT} 
+      value: ${KARPENTER_CLUSTER_ENDPOINT} 
