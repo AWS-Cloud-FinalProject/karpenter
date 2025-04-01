@@ -41,15 +41,50 @@ jobs:
         aws configure set aws_secret_access_key ${{ secrets.AWS_SECRET_ACCESS_KEY }}
         aws configure set region ${{ env.AWS_REGION }}
 
-    - name: Update kube config
+    - name: Setup kubeconfig
       run: |
-        aws eks update-kubeconfig --name ${{ env.CLUSTER_NAME }} --region ${{ env.AWS_REGION }}
-        export KUBECONFIG=~/.kube/config
+        CLUSTER_ENDPOINT=$(aws eks describe-cluster --name ${{ env.CLUSTER_NAME }} --query "cluster.endpoint" --output text)
+        CERTIFICATE_DATA=$(aws eks describe-cluster --name ${{ env.CLUSTER_NAME }} --query "cluster.certificateAuthority.data" --output text)
+        mkdir -p ~/.kube
+        cat > ~/.kube/config << EOF
+        apiVersion: v1
+        kind: Config
+        clusters:
+        - cluster:
+            server: $CLUSTER_ENDPOINT
+            certificate-authority-data: $CERTIFICATE_DATA
+          name: ${{ env.CLUSTER_NAME }}
+        contexts:
+        - context:
+            cluster: ${{ env.CLUSTER_NAME }}
+            user: aws
+          name: aws
+        current-context: aws
+        preferences: {}
+        users:
+        - name: aws
+          user:
+            exec:
+              apiVersion: client.authentication.k8s.io/v1beta1
+              command: aws
+              args:
+                - eks
+                - get-token
+                - --cluster-name
+                - ${{ env.CLUSTER_NAME }}
+              env:
+                - name: AWS_ACCESS_KEY_ID
+                  value: ${{ secrets.AWS_ACCESS_KEY_ID }}
+                - name: AWS_SECRET_ACCESS_KEY
+                  value: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+                - name: AWS_DEFAULT_REGION
+                  value: ${{ env.AWS_REGION }}
+        EOF
         chmod 600 ~/.kube/config
+        export KUBECONFIG=~/.kube/config
 
     - name: Verify cluster access
       run: |
-        aws eks get-token --cluster-name ${{ env.CLUSTER_NAME }} --region ${{ env.AWS_REGION }}
         kubectl get nodes
 
     - name: Install Karpenter
