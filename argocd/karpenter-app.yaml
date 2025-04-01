@@ -9,6 +9,19 @@ spec:
     repoURL: https://github.com/AWS-Cloud-FinalProject/karpenter.git
     targetRevision: HEAD
     path: karpenter
+    helm:
+      valueFiles:
+        - values.yaml
+      values: |
+        serviceAccount:
+          annotations:
+            eks.amazonaws.com/role-arn: arn:aws:iam::${AWS_ACCOUNT_ID}:role/KarpenterNodeRole
+        settings:
+          aws:
+            clusterName: ${CLUSTER_NAME}
+            clusterEndpoint: ${CLUSTER_ENDPOINT}
+            defaultInstanceProfile: KarpenterNodeInstanceProfile
+            interruptionQueueName: ${CLUSTER_NAME}
   destination:
     server: https://kubernetes.default.svc
     namespace: karpenter

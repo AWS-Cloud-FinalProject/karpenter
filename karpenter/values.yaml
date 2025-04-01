@@ -1,0 +1,21 @@
+serviceAccount:
+  create: true
+  name: karpenter
+  annotations:
+    eks.amazonaws.com/role-arn: arn:aws:iam::${AWS_ACCOUNT_ID}:role/KarpenterNodeRole
+
+controller:
+  resources:
+    requests:
+      cpu: 1
+      memory: 1Gi
+    limits:
+      cpu: 1
+      memory: 1Gi
+
+settings:
+  aws:
+    clusterName: ${CLUSTER_NAME}
+    clusterEndpoint: ${CLUSTER_ENDPOINT}
+    defaultInstanceProfile: KarpenterNodeInstanceProfile
+    interruptionQueueName: ${CLUSTER_NAME} 
