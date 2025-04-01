@@ -49,9 +49,13 @@ jobs:
         AWS_DEFAULT_REGION: ${{ env.AWS_REGION }}
         KUBECONFIG: ${{ env.KUBECONFIG }}
       run: |
-        CLUSTER_ENDPOINT=$(aws eks describe-cluster --name ${{ env.CLUSTER_NAME }} --query "cluster.endpoint" --output text)
-        CERTIFICATE_DATA=$(aws eks describe-cluster --name ${{ env.CLUSTER_NAME }} --query "cluster.certificateAuthority.data" --output text)
+        echo "Creating .kube directory..."
         mkdir -p ~/.kube
+        echo "Getting cluster endpoint..."
+        CLUSTER_ENDPOINT=$(aws eks describe-cluster --name ${{ env.CLUSTER_NAME }} --query "cluster.endpoint" --output text)
+        echo "Getting certificate data..."
+        CERTIFICATE_DATA=$(aws eks describe-cluster --name ${{ env.CLUSTER_NAME }} --query "cluster.certificateAuthority.data" --output text)
+        echo "Creating kubeconfig file..."
         cat > ${{ env.KUBECONFIG }} << EOF
         apiVersion: v1
         kind: Config
@@ -86,7 +90,12 @@ jobs:
                 - name: AWS_DEFAULT_REGION
                   value: ${{ env.AWS_REGION }}
         EOF
+        echo "Setting kubeconfig permissions..."
         chmod 600 ${{ env.KUBECONFIG }}
+        echo "Verifying kubeconfig file exists..."
+        ls -la ${{ env.KUBECONFIG }}
+        echo "Kubeconfig file contents:"
+        cat ${{ env.KUBECONFIG }}
 
     - name: Verify cluster access
       env:
@@ -95,7 +104,17 @@ jobs:
         AWS_DEFAULT_REGION: ${{ env.AWS_REGION }}
         KUBECONFIG: ${{ env.KUBECONFIG }}
       run: |
+        echo "Current directory:"
+        pwd
+        echo "Home directory:"
+        echo $HOME
+        echo "Kubeconfig path:"
+        echo ${{ env.KUBECONFIG }}
+        echo "Kubeconfig exists:"
+        ls -la ${{ env.KUBECONFIG }}
+        echo "Kubectl config view output:"
         kubectl --kubeconfig=${{ env.KUBECONFIG }} config view
+        echo "Getting nodes:"
         kubectl --kubeconfig=${{ env.KUBECONFIG }} get nodes
 
     - name: Install Karpenter
