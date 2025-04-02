@@ -1,7 +1,7 @@
 apiVersion: policy/v1
 kind: PodDisruptionBudget
 metadata:
-  name: frontend-pdb
+  name: frontend
   namespace: frontend
 spec:
   minAvailable: 1

@@ -1,14 +1,13 @@
 apiVersion: autoscaling/v2
 kind: HorizontalPodAutoscaler
 metadata:
-  name: backend
-  namespace: backend
+  name: inflate
 spec:
   scaleTargetRef:
     apiVersion: apps/v1
     kind: Deployment
-    name: backend
-  minReplicas: 2
+    name: inflate
+  minReplicas: 1
   maxReplicas: 10
   metrics:
   - type: Resource
@@ -16,7 +15,7 @@ spec:
       name: cpu
       target:
         type: Utilization
-        averageUtilization: 70
+        averageUtilization: 50
   - type: Resource
     resource:
       name: memory

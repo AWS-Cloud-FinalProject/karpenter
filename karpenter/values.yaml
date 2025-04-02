@@ -2,20 +2,47 @@ serviceAccount:
   create: true
   name: karpenter
   annotations:
-    eks.amazonaws.com/role-arn: arn:aws:iam::${AWS_ACCOUNT_ID}:role/KarpenterNodeRole
+    eks.amazonaws.com/role-arn: arn:aws:iam::688567288847:role/KarpenterNodeRole
+
+rbac:
+  create: true
+  rules:
+    - apiGroups: [""]
+      resources: ["nodes", "pods", "events"]
+      verbs: ["get", "list", "watch", "update", "patch", "create", "delete"]
 
 controller:
   resources:
     requests:
-      cpu: 1
-      memory: 1Gi
+      cpu: 500m
+      memory: 512Mi
     limits:
-      cpu: 1
-      memory: 1Gi
+      cpu: 500m
+      memory: 512Mi
+  env:
+    - name: CLUSTER_NAME
+      value: wiary
+    - name: CLUSTER_ENDPOINT
+      value: https://51BBC0043160FACE9EFDE807DE3D1070.gr7.us-west-2.eks.amazonaws.com
+    - name: AWS_DEFAULT_REGION
+      value: us-west-2
+    - name: AWS_REGION
+      value: us-west-2
+    - name: AWS_STS_REGIONAL_ENDPOINTS
+      value: regional
+    - name: AWS_ROLE_ARN
+      value: arn:aws:iam::688567288847:role/KarpenterNodeRole
 
 settings:
   aws:
-    clusterName: ${CLUSTER_NAME}
-    clusterEndpoint: ${CLUSTER_ENDPOINT}
+    clusterName: wiary
+    clusterEndpoint: https://51BBC0043160FACE9EFDE807DE3D1070.gr7.us-west-2.eks.amazonaws.com
     defaultInstanceProfile: KarpenterNodeInstanceProfile
-    interruptionQueueName: ${CLUSTER_NAME} 
+    interruptionQueueName: wiary
+    region: us-west-2
+    stsRegionalEndpoints: regional
+    assumeRoleARN: arn:aws:iam::688567288847:role/KarpenterNodeRole
+    subnetSelector:
+      kubernetes.io/cluster/wiary: "shared"
+    securityGroupSelector:
+      kubernetes.io/cluster/wiary: "shared"
